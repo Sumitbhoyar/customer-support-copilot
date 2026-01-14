@@ -92,3 +92,62 @@ flowchart TB
 - Single Lambda router keeps caches warm and reduces cold starts.
 - Handlers stay thin; services encapsulate Bedrock, Postgres, DynamoDB access.
 - `/kb/sync` can be called manually; S3 events also trigger ingestion (see KB pipeline).
+
+## Customer Data Service (CustomerService)
+```mermaid
+flowchart LR
+  Client["Lambda Router main.py<br/>(ticket_ingestion, customer_context)"]
+  Cache["LRU cache (in-memory)<br/>per warm Lambda"]
+  Repo["CustomerService"]
+  PG["Postgres<br/>customers, orders"]
+  DDB["DynamoDB<br/>interaction logs (TTL)"]
+  Risk["Churn risk calc"]
+
+  Client --> Repo
+  Repo --> Cache
+  Cache -->|hit| Client
+  Cache -. miss .-> Repo
+  Repo -->|profile + orders| PG
+  Repo -->|interactions| DDB
+  Repo --> Risk
+  Risk --> Client
+```
+
+**Notes**
+- Cache survives warm invocations to cut DB/KB calls; TTL and max size are tunable.
+- Postgres returns core profile and recent orders; DynamoDB returns recent interactions + sentiment.
+- Risk scoring combines sentiment and recency to tag customers as low/medium/high risk.
+- If DB credentials are absent, service returns a safe placeholder profile for local/dev runs.
+
+## Ticket processing + Customer data (end-to-end)
+```mermaid
+flowchart LR
+  subgraph DataCreation["Data creation / storage"]
+    Ops["Ops / CRM / eCommerce systems"] -->|profiles, orders| PG["Postgres<br/>customers, orders"]
+    Ops -->|interaction events| DDB["DynamoDB<br/>interaction logs (TTL)"]
+  end
+
+  subgraph APIFlow["API request flow (/tickets, /tickets/{id}/context)"]
+    Client["Client / Frontend"] --> APIgw["HTTP API v2"]
+    APIgw --> Lmain["Lambda Router main.py"]
+    Lmain --> Hticket["ticket_ingestion.py"]
+    Lmain --> Hcontext["customer_context.py"]
+  end
+
+  Hticket --> CustSvc["CustomerService<br/>cache + Postgres + DynamoDB"]
+  Hcontext --> CustSvc
+
+  CustSvc -->|profile + orders| PG
+  CustSvc -->|interactions + sentiment| DDB
+  CustSvc --> Resp["CustomerContext / TicketResponse JSON"]
+
+  Hticket --> KBsvc["BedrockService<br/>retrieve suggestions"] --> BRRT["Bedrock Agent Runtime"] --> BR["Knowledge Base"]
+  KBsvc --> Resp
+
+  Resp --> Client
+```
+
+**Lifecycle summary**
+- Data creation: customer profiles/orders land in Postgres; interaction events land in DynamoDB (TTL trims old items).
+- Serving: API Gateway → Lambda router → handlers call `CustomerService` to assemble context (with in-memory cache) and `BedrockService` for KB suggestions.
+- Responses: ticket ingestion returns status + customer context + KB suggestions; context endpoint returns customer snapshot.
