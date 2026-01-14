@@ -32,3 +32,63 @@ graph TB
 - `ENVIRONMENT=prod` flips DB retention, deletion protection, and NAT.
 - `lambda_memory_mb`, `lambda_timeout_seconds` in `Settings` tune Lambda cost/perf.
 - Bedrock model IDs set to **Claude Haiku** and **Titan Embeddings** to stay cost friendly.
+
+## Bedrock Knowledge Base pipeline
+```mermaid
+flowchart LR
+  U[Users / Ops] -- Upload / delete docs --> S3[KB Docs Bucket<br/>Private, versioned<br/>Lifecycle: Intelligent-Tiering]
+  S3 -- S3 Event (Put/Delete) --> EB[EventBridge Rule<br/>source=aws.s3<br/>detail-type=Object Created/Deleted]
+  EB --> Lsync[KB Sync Lambda<br/>ARM64, 256 MB]
+  Lsync -- start_ingestion_job --> BR[Bedrock KB Ingestion<br/>DataSourceId + KB Id]
+  BR --> OSS[OpenSearch Serverless<br/>Managed vector store]
+
+  subgraph Runtime
+    API[HTTP API v2<br/>CORS ANY/*] --> Lapi[Lambda Router<br/>ARM64, 512 MB<br/>Shared cache]
+    Lapi --> BRRT[Bedrock Agent Runtime<br/>Claude 3.5 Haiku<br/>Titan Embeddings]
+    BRRT --> OSS
+    Lapi -->|/kb/sync| Lsync
+  end
+
+  U -. manual /kb/sync .-> API
+```
+
+**Flow**
+- Document upload/removal in `KnowledgeDocsBucket` emits S3 events.
+- EventBridge rule triggers `KbSync` Lambda to start a Bedrock ingestion job for the KB data source.
+- At query time, API → Lambda Router calls Bedrock Agent Runtime to retrieve relevant chunks from the KB.
+- Manual sync is available via the `/kb/sync` endpoint; ops can also re-trigger ingestion without re-uploading.
+
+## Web/API flow (Lambda router in `main.py`)
+```mermaid
+flowchart TB
+  subgraph Ingress
+    Client[Client / Frontend] --> API[HTTP API v2<br/>Routes: /health, /tickets, /tickets/{id}/context, /tickets/{id}/feedback, /kb/sync]
+  end
+
+  API --> Lmain[Lambda Router (main.py)<br/>ARM64 512 MB<br/>Shared caches per warm container]
+
+  subgraph Handlers
+    Lmain --> Hhealth[health_check.py]
+    Lmain --> Hticket[ticket_ingestion.py]
+    Lmain --> Hcontext[customer_context.py]
+    Lmain --> Hsync[kb_sync.py]
+  end
+
+  Hhealth --> Resp1[JSON 200]
+  Hticket --> SvcCust[CustomerService<br/>LRU cache + DB/DDB] -->|profile/orders| RDS[(Postgres)]
+  SvcCust -->|interactions| DDB[(DynamoDB)]
+  Hticket --> SvcKB[BedrockService<br/>retrieve suggestions] --> BRRT[Bedrock Agent Runtime]
+  BRRT --> BR[Knowledge Base / OpenSearch Serverless]
+  Hticket --> Resp2[TicketResponse JSON]
+
+  Hcontext --> SvcCust
+  Hcontext --> Resp3[CustomerContext JSON]
+
+  Hsync --> BRAPI[Bedrock Agent API<br/>start_ingestion_job]
+  BRAPI --> Resp4[Sync started JSON]
+```
+
+**Key points**
+- Single Lambda router keeps caches warm and reduces cold starts.
+- Handlers stay thin; services encapsulate Bedrock, Postgres, DynamoDB access.
+- `/kb/sync` can be called manually; S3 events also trigger ingestion (see KB pipeline).
