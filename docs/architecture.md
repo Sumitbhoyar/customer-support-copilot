@@ -62,7 +62,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph Ingress
-    Client[Client / Frontend] --> API[HTTP API v2<br/>Routes: /health, /tickets, /tickets/{id}/context, /tickets/{id}/feedback, /kb/sync]
+    Client[Client / Frontend] --> API[HTTP API v2<br/>Routes:<br/>/health<br/>/tickets<br/>/tickets/&#123;id&#125;/context<br/>/tickets/&#123;id&#125;/feedback<br/>/kb/sync]
   end
 
   API --> Lmain[Lambda Router (main.py)<br/>ARM64 512 MB<br/>Shared caches per warm container]
