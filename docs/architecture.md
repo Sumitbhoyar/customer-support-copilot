@@ -62,10 +62,10 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph Ingress
-    Client[Client / Frontend] --> API[HTTP API v2<br/>Routes:<br/>/health<br/>/tickets<br/>/tickets/&#123;id&#125;/context<br/>/tickets/&#123;id&#125;/feedback<br/>/kb/sync]
+    Client["Client / Frontend"] --> API["HTTP API v2<br/>Routes:<br/>/health<br/>/tickets<br/>/tickets/&#123;id&#125;/context<br/>/tickets/&#123;id&#125;/feedback<br/>/kb/sync"]
   end
 
-  API --> Lmain[Lambda Router (main.py)<br/>ARM64 512 MB<br/>Shared caches per warm container]
+  API --> Lmain["Lambda Router main.py<br/>ARM64 512 MB<br/>Shared caches per warm container"]
 
   subgraph Handlers
     Lmain --> Hhealth[health_check.py]
@@ -74,18 +74,18 @@ flowchart TB
     Lmain --> Hsync[kb_sync.py]
   end
 
-  Hhealth --> Resp1[JSON 200]
-  Hticket --> SvcCust[CustomerService<br/>LRU cache + DB/DDB] -->|profile/orders| RDS[(Postgres)]
+  Hhealth --> Resp1["JSON 200"]
+  Hticket --> SvcCust["CustomerService<br/>LRU cache + DB/DDB"] -->|profile/orders| RDS[(Postgres)]
   SvcCust -->|interactions| DDB[(DynamoDB)]
-  Hticket --> SvcKB[BedrockService<br/>retrieve suggestions] --> BRRT[Bedrock Agent Runtime]
-  BRRT --> BR[Knowledge Base / OpenSearch Serverless]
-  Hticket --> Resp2[TicketResponse JSON]
+  Hticket --> SvcKB["BedrockService<br/>retrieve suggestions"] --> BRRT["Bedrock Agent Runtime"]
+  BRRT --> BR["Knowledge Base / OpenSearch Serverless"]
+  Hticket --> Resp2["TicketResponse JSON"]
 
   Hcontext --> SvcCust
-  Hcontext --> Resp3[CustomerContext JSON]
+  Hcontext --> Resp3["CustomerContext JSON"]
 
-  Hsync --> BRAPI[Bedrock Agent API<br/>start_ingestion_job]
-  BRAPI --> Resp4[Sync started JSON]
+  Hsync --> BRAPI["Bedrock Agent API<br/>start_ingestion_job"]
+  BRAPI --> Resp4["Sync started JSON"]
 ```
 
 **Key points**
