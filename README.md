@@ -30,8 +30,8 @@ flowchart LR
   subgraph Ingestion
     S3[KB Docs Bucket] --> EB[EventBridge Rule] --> Lsync[KB Sync Lambda] --> Bedrock[Bedrock KB]
   end
-  subgraph API
-    Client --> API[API Gateway HTTP API] --> Lapi[Lambda Router]
+  subgraph APILayer
+    Client --> APIgw[API Gateway HTTP API] --> Lapi[Lambda Router]
     Lapi --> RDS[(Postgres)]
     Lapi --> DDB[(DynamoDB)]
     Lapi --> Bedrock
