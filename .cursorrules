@@ -1,0 +1,69 @@
+# ============================================
+# AI Customer Support Platform - Cursor Rules
+# ============================================
+
+# Project Context
+- This is an AWS serverless application for AI-assisted customer support
+- We use AWS CDK (Python) for infrastructure as code
+- Runtime is Python 3.12 with AWS Lambda (ARM64 architecture)
+- Primary AI service is Amazon Bedrock with Claude 3.5 Haiku (cost-optimized)
+
+# Code Style & Standards
+- Follow PEP 8 style guidelines strictly
+- Use type hints for all function parameters and return values
+- Use Pydantic v2 for data validation and models
+- Use async/await patterns where beneficial for I/O operations
+- Maximum line length: 100 characters
+- Use descriptive variable names (no single letters except loop counters)
+
+# AWS CDK Conventions
+- Use L2 constructs (higher-level) when available
+- Apply least-privilege IAM policies
+- Use environment variables for configuration, never hardcode secrets
+- Tag all resources with: Project, Environment, CostCenter
+- Use removal_policy=RETAIN for production databases, DESTROY for dev
+
+# Lambda Best Practices
+- Use ARM64 architecture (Graviton2) for 20% cost savings
+- Keep handler functions thin; delegate to service classes
+- Use Lambda Powertools for logging, tracing, metrics
+- Implement connection pooling for database connections
+- Set appropriate memory (512MB default) and timeout (30s default)
+- Use Lambda layers for shared dependencies
+
+# Error Handling
+- Use custom exception classes in src/utils/error_handling.py
+- Always log errors with context before re-raising
+- Return structured error responses with correlation IDs
+- Implement circuit breaker pattern for external service calls
+
+# Database Access
+- Use SQLAlchemy Core (not ORM) for PostgreSQL - lightweight
+- Use boto3 resource API for DynamoDB
+- Always use parameterized queries (no string concatenation)
+- Implement repository pattern for data access abstraction
+
+# Testing
+- Write unit tests for all service classes
+- Use pytest with pytest-asyncio for async tests
+- Mock AWS services using moto library
+- Maintain >80% code coverage for src/ directory
+
+# Security
+- Never log sensitive data (PII, credentials, tokens)
+- Use AWS Secrets Manager for database credentials
+- Validate all input using Pydantic models
+- Implement request throttling at API Gateway level
+
+# Cost Optimization (IMPORTANT)
+- Prefer Bedrock Claude Haiku over Sonnet for simple tasks
+- Use S3 Intelligent-Tiering for document storage
+- Implement in-memory LRU cache before external cache calls
+- Use SQS Standard (not FIFO) unless ordering is critical
+- Use API Gateway HTTP API (v2), not REST API
+- Batch DynamoDB operations where possible
+
+# Documentation
+- Add docstrings to all public functions and classes
+- Update README.md when adding new features
+- Keep API spec (docs/api_spec.yaml) in sync with implementation
