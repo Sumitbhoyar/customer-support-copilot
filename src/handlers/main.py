@@ -35,10 +35,10 @@ def lambda_handler(event, context):
     # Map route keys to handler callables. Using startswith for path params.
     route_table: Tuple[Tuple[str, Callable], ...] = (
         ("GET /health", health_check.lambda_handler),
-        ("POST /tickets", ticket_ingestion.lambda_handler),
-        ("POST /tickets/", ticket_ingestion.lambda_handler),  # fallback for path params
+        ("POST /tickets/", ticket_ingestion.feedback_handler),  # more specific feedback first
         ("GET /tickets/", customer_context.lambda_handler),
-        ("POST /tickets/", ticket_ingestion.feedback_handler),
+        ("POST /tickets", ticket_ingestion.lambda_handler),
+        ("POST /tickets/", ticket_ingestion.lambda_handler),  # fallback for other POST paths
         ("POST /kb/sync", kb_sync.lambda_handler),
     )
 
