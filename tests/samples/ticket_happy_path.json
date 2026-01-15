@@ -1,0 +1,14 @@
+{
+  "ticket_id": "t-100",
+  "external_ticket_id": "ext-100",
+  "customer_external_id": "cust-ext-1",
+  "subject": "Login issue",
+  "description": "Reset password link fails with 500 error",
+  "channel": "email",
+  "priority": "high",
+  "metadata": {
+    "locale": "en-US",
+    "app": "web"
+  },
+  "created_at": "2024-12-01T10:00:00Z"
+}

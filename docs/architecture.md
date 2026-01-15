@@ -128,7 +128,9 @@ flowchart LR
   end
 
   subgraph APIFlow["API request flow (/tickets, /tickets/{id}/context)"]
-    Client["Client / Frontend"] --> APIgw["HTTP API v2"]
+    Web["Web/mobile app or portal"] --> APIgw["HTTP API v2"]
+    Integrations["Integrations<br/>(CRM/ecomm/webhooks)"] --> APIgw
+    Channels["Channel ingest<br/>(email/chat/IVR)"] --> APIgw
     APIgw --> Lmain["Lambda Router main.py"]
     Lmain --> Hticket["ticket_ingestion.py"]
     Lmain --> Hcontext["customer_context.py"]
@@ -146,6 +148,12 @@ flowchart LR
 
   Resp --> Client
 ```
+
+**How tickets enter the system (real life)**
+- Web/mobile app or support portal submits JSON to `POST /tickets`.
+- Integrations (CRM/ecommerce/webhooks) call `POST /tickets` directly.
+- Channel ingestion pipelines (email parser, chat widget, IVR transcript) post the ticket payload to API Gateway.
+- Humans do not hand-craft JSON; the sample payloads in `tests/samples/` are only for manual testing or Postman/curl.
 
 **Lifecycle summary**
 - Data creation: customer profiles/orders land in Postgres; interaction events land in DynamoDB (TTL trims old items).

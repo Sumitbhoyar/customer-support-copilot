@@ -1,0 +1,6 @@
+GET /tickets/cust-ext-1/context HTTP/1.1
+Host: <ApiEndpoint>
+
+# Or with query param if path ID is arbitrary:
+# GET /tickets/anything/context?customer_external_id=cust-ext-1 HTTP/1.1
+# Host: <ApiEndpoint>
