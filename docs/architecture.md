@@ -103,8 +103,8 @@ flowchart TB
 flowchart LR
     subgraph Context
         KB[Bedrock KB vector search] --> Rerank[Rerank]
-        Orders[Structured lookups: orders + SLA] --> Pack[Context package]
-        Tickets[Similar tickets (DynamoDB stub)] --> Pack
+        Orders[Structured lookups orders + SLA] --> Pack[Context package]
+        Tickets[Similar tickets DynamoDB] --> Pack
         Rerank --> Pack
     end
     Pack --> Drafts[Draft generation]
