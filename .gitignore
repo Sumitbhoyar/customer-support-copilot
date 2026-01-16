@@ -1,0 +1,28 @@
+# Local helper scripts (keep credentials out of git)
+local-run-sample.bat
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+env/
+venv/
+.coverage
+coverage.xml
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
+
+# CDK and build artifacts
+cdk.out/
+.cdk.staging/
+.aws-sam/
+
+# Environment files
+.env
+.env.*

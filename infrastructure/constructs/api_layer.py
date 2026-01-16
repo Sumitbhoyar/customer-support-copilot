@@ -71,11 +71,18 @@ class ApiLayerConstruct(Construct):
         )
 
         # Register routes from the spec.
-        for route in [
-            apigw.HttpRouteKey.with_("POST", "/tickets"),
-            apigw.HttpRouteKey.with_("GET", "/tickets/{id}/context"),
-            apigw.HttpRouteKey.with_("POST", "/tickets/{id}/feedback"),
-            apigw.HttpRouteKey.with_("GET", "/health"),
-            apigw.HttpRouteKey.with_("POST", "/kb/sync"),
-        ]:
-            self.api.add_routes(route_key=route, integration=integration)
+        route_defs = [
+            (apigw.HttpMethod.POST, "/tickets"),
+            (apigw.HttpMethod.GET, "/tickets/{id}/context"),
+            (apigw.HttpMethod.POST, "/tickets/{id}/feedback"),
+            (apigw.HttpMethod.GET, "/health"),
+            (apigw.HttpMethod.POST, "/kb/sync"),
+        ]
+
+        for method, path in route_defs:
+            route_key = apigw.HttpRouteKey.with_(method=method, path=path)
+            self.api.add_routes(
+                path=path,
+                methods=[method],
+                integration=integration,
+            )

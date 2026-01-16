@@ -14,7 +14,7 @@ class Settings:
 
     # Environment
     environment: str = "dev"
-    aws_region: str = "eu-west-2"  # London (closest Bedrock region to Paris)
+    aws_region: str = "eu-west-2"  # Default AWS region
 
     # Bedrock Configuration
     model_id: str = "anthropic.claude-3-haiku-20240307-v1:0"  # Cost-optimized
@@ -25,7 +25,7 @@ class Settings:
     chunking_overlap_percentage: int = 10
 
     # Database Configuration (Cost-optimized)
-    db_instance_class: str = "db.t3.micro"  # Free tier eligible
+    db_instance_class: str = "t3.micro"  # Free tier eligible
     db_allocated_storage: int = 20  # Minimum GB
 
     # Lambda Configuration
@@ -46,7 +46,7 @@ class Settings:
         if env == "prod":
             return cls(
                 environment="prod",
-                db_instance_class="db.t3.small",  # Upgrade for prod
+                db_instance_class="t3.small",  # Upgrade for prod
                 db_allocated_storage=50,
                 lambda_memory_mb=1024,
                 lambda_timeout_seconds=60,

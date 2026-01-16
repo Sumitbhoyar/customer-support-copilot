@@ -428,7 +428,7 @@ class BedrockService:
         self,
         knowledge_base_id: str,
         model_id: str = "anthropic.claude-3-haiku-20240307-v1:0",
-        region: str = "us-east-1"
+        region: str = "eu-west-2"
     ):
         self.knowledge_base_id = knowledge_base_id
         self.model_id = model_id
@@ -520,7 +520,7 @@ class BedrockService:
                     "type": "KNOWLEDGE_BASE",
                     "knowledgeBaseConfiguration": {
                         "knowledgeBaseId": self.knowledge_base_id,
-                        "modelArn": f"arn:aws:bedrock:us-east-1::foundation-model/{self.model_id}",
+                        "modelArn": f"arn:aws:bedrock:eu-west-2::foundation-model/{self.model_id}",
                         "retrievalConfiguration": {
                             "vectorSearchConfiguration": {
                                 "numberOfResults": max_results
@@ -1039,7 +1039,7 @@ class Settings:
 
     # Environment
     environment: str = "dev"
-    aws_region: str = "us-east-1"
+    aws_region: str = "eu-west-2"
 
     # Bedrock Configuration
     model_id: str = "anthropic.claude-3-haiku-20240307-v1:0"  # Cost-optimized
@@ -1092,7 +1092,7 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # Bootstrap CDK (first time only)
-cdk bootstrap aws://ACCOUNT_ID/us-east-1
+cdk bootstrap aws://ACCOUNT_ID/eu-west-2
 
 # Synthesize CloudFormation template
 cdk synth

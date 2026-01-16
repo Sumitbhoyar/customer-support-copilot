@@ -9,14 +9,17 @@ Creates:
 """
 
 from typing import Optional
+import json
 
 from aws_cdk import (
     Duration,
     RemovalPolicy,
+    Stack,
     aws_ec2 as ec2,
     aws_iam as iam,
     aws_s3 as s3,
     aws_bedrock as bedrock,
+    aws_opensearchserverless as aoss,
 )
 from constructs import Construct
 
@@ -96,6 +99,79 @@ class KnowledgeBaseConstruct(Construct):
         self.documents_bucket.grant_read(self.kb_role)
 
         # Knowledge Base definition (managed vector store).
+        region = Stack.of(self).region
+
+        # OpenSearch Serverless collection (vector search).
+        collection_name = f"kb-{environment}"
+        # Encryption policy for the collection.
+        encryption_policy = {
+            "Rules": [{"ResourceType": "collection", "Resource": [f"collection/{collection_name}"]}],
+            # Use AWS-owned key for simpler setup; swap to KMS key if needed.
+            "AWSOwnedKey": True,
+        }
+        self.aoss_encryption = aoss.CfnSecurityPolicy(
+            self,
+            "KbEncryptionPolicy",
+            name=f"kb-encryption-{environment}",
+            type="encryption",
+            policy=json.dumps(encryption_policy),
+        )
+
+        # Network policy - allow public access (adjust to VPC if desired).
+        network_policy = [
+            {
+                "Rules": [
+                    {
+                        "ResourceType": "collection",
+                        "Resource": [f"collection/{collection_name}"],
+                    }
+                ],
+                "AllowFromPublic": True,
+            }
+        ]
+        self.aoss_network = aoss.CfnSecurityPolicy(
+            self,
+            "KbNetworkPolicy",
+            name=f"kb-network-{environment}",
+            type="network",
+            policy=json.dumps(network_policy),
+        )
+
+        # Collection depends on encryption and network policies.
+        self.aoss_collection = aoss.CfnCollection(
+            self,
+            "KbCollection",
+            name=collection_name,
+            type="VECTORSEARCH",
+            description="KB vector store",
+        )
+        self.aoss_collection.add_dependency(self.aoss_encryption)
+        self.aoss_collection.add_dependency(self.aoss_network)
+
+        # Data access policy for the KB role.
+        data_access_policy = [
+            {
+                "Rules": [
+                    {
+                        "Resource": [
+                            f"collection/{collection_name}",
+                            f"index/{collection_name}/*",
+                        ],
+                        "Permission": ["aoss:*"],
+                    }
+                ],
+                "Principal": [self.kb_role.role_arn],
+            }
+        ]
+        self.aoss_data_access = aoss.CfnAccessPolicy(
+            self,
+            "KbDataAccess",
+            name=f"kb-data-{environment}",
+            type="data",
+            policy=json.dumps(data_access_policy),
+        )
+        self.aoss_data_access.add_dependency(self.aoss_collection)
+
         self.knowledge_base = bedrock.CfnKnowledgeBase(
             self,
             "KnowledgeBase",
@@ -105,14 +181,24 @@ class KnowledgeBaseConstruct(Construct):
                 type="VECTOR",
                 vector_knowledge_base_configuration=bedrock.CfnKnowledgeBase.VectorKnowledgeBaseConfigurationProperty(
                     embedding_model_arn=(
-                        f"arn:aws:bedrock:{self.region}::foundation-model/{embedding_model_id}"
+                        f"arn:aws:bedrock:{region}::foundation-model/{embedding_model_id}"
                     )
                 ),
             ),
             storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
-                type="OPENSEARCH_SERVERLESS"
+                type="OPENSEARCH_SERVERLESS",
+                opensearch_serverless_configuration=bedrock.CfnKnowledgeBase.OpenSearchServerlessConfigurationProperty(
+                    collection_arn=self.aoss_collection.attr_arn,
+                    vector_index_name="kb-index",
+                    field_mapping=bedrock.CfnKnowledgeBase.OpenSearchServerlessFieldMappingProperty(
+                        vector_field="vector",
+                        text_field="text",
+                        metadata_field="metadata",
+                    ),
+                ),
             ),
         )
+        self.knowledge_base.add_dependency(self.aoss_data_access)
 
         # Data source that ties the bucket to the KB with chunking config.
         self.data_source = bedrock.CfnDataSource(
@@ -124,16 +210,8 @@ class KnowledgeBaseConstruct(Construct):
                 type="S3",
                 s3_configuration=bedrock.CfnDataSource.S3DataSourceConfigurationProperty(
                     bucket_arn=self.documents_bucket.bucket_arn,
-                    inclusion_prefixes=[],
-                    # Bedrock expects chunking configuration in data source.
-                    knowledge_base_state="ENABLED",
-                ),
-            ),
-            chunking_configuration=bedrock.CfnDataSource.ChunkingConfigurationProperty(
-                chunking_strategy="FIXED_SIZE",
-                fixed_size_chunking_configuration=bedrock.CfnDataSource.FixedSizeChunkingConfigurationProperty(
-                    max_tokens=chunking_max_tokens,
-                    overlap_percentage=chunking_overlap_percentage,
+                    # Include all objects in the bucket by using root prefix.
+                    inclusion_prefixes=["/"],
                 ),
             ),
         )

@@ -9,10 +9,10 @@
    - `.\.venv\Scripts\Activate.ps1`
    - `pip install -r requirements.txt`
 2) Prereqs: install AWS CLI v2, Node.js 18+, `npm install -g aws-cdk`.
-3) Bootstrap CDK (first time, London for Paris proximity): `cdk bootstrap aws://YOUR_ACCOUNT/eu-west-2`
+3) Bootstrap CDK (first time, use eu-west-2): `cdk bootstrap aws://YOUR_ACCOUNT/eu-west-2`
 4) Deploy (dev):
    - `$env:ENVIRONMENT="dev"`
-   - `$env:AWS_REGION="eu-west-2"`  # Bedrock + proximity to Paris
+   - `$env:AWS_REGION="eu-west-2"`  # Default region
    - `cdk deploy --require-approval never`
 5) Check outputs for `ApiEndpoint`, `KnowledgeBaseId`, `DocumentsBucket`.
 
@@ -74,6 +74,45 @@ sequenceDiagram
 ## Testing
 - Unit tests: `pytest tests/unit -v`
 - Add DATABASE_URL/ AWS creds if you want live integration tests.
+
+## Local run against real AWS (Windows, PowerShell)
+- Prereqs: AWS CLI configured (`aws configure --profile dev`) and venv active.
+- Set session env vars (example):
+  - `$env:AWS_REGION="eu-west-2"`  # and optionally `$env:BEDROCK_REGION="eu-west-2"`
+  - `$env:AWS_PROFILE="dev"`  # or set `AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY/SESSION_TOKEN`
+  - `$env:DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/dbname"`  
+    # or `$env:DB_SECRET_ARN="arn:aws:secretsmanager:...:secret:your-secret"`
+  - `$env:INTERACTIONS_TABLE="customer-interactions"`  # your DynamoDB table
+  - `$env:KNOWLEDGE_BASE_ID="kb-xxxxxxxx"`  # optional; otherwise KB calls return empty suggestions
+- Invoke handlers directly (no API Gateway) to hit real services:
+  ```powershell
+  python - <<'PY'
+  import json, datetime
+  from src.handlers import ticket_ingestion
+  payload = {
+      "ticket_id": "t-100",
+      "external_ticket_id": "ext-100",
+      "customer_external_id": "cust-ext-1",
+      "subject": "Login issue",
+      "description": "Reset password link fails",
+      "channel": "email",
+      "priority": "high",
+      "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+  }
+  event = {"body": json.dumps(payload)}
+  print(ticket_ingestion.lambda_handler(event, None))
+  PY
+  ```
+- To test customer context only:
+  ```powershell
+  python - <<'PY'
+  from src.handlers import customer_context
+  event = {"pathParameters": {"id": "cust-ext-1"}, "queryStringParameters": None}
+  print(customer_context.lambda_handler(event, None))
+  PY
+  ```
+- Tip: If you lack real AWS creds but want to avoid boto3 region errors, set dummy keys plus region:
+  `$env:AWS_REGION="eu-west-2"; $env:AWS_ACCESS_KEY_ID="fake"; $env:AWS_SECRET_ACCESS_KEY="fake"`
 
 ## What to customize next
 - Wire SQS for async ticket processing (Phase 2).
