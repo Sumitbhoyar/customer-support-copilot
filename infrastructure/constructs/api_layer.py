@@ -73,6 +73,10 @@ class ApiLayerConstruct(Construct):
         # Register routes from the spec.
         route_defs = [
             (apigw.HttpMethod.POST, "/tickets"),
+            (apigw.HttpMethod.POST, "/tickets/classify"),
+            (apigw.HttpMethod.POST, "/tickets/context"),
+            (apigw.HttpMethod.POST, "/tickets/respond"),
+            (apigw.HttpMethod.POST, "/tickets/auto-orchestrate"),
             (apigw.HttpMethod.GET, "/tickets/{id}/context"),
             (apigw.HttpMethod.POST, "/tickets/{id}/feedback"),
             (apigw.HttpMethod.GET, "/health"),

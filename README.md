@@ -1,7 +1,7 @@
-# AI-Assisted Customer Support & Helpdesk Automation (Phase 1)
+# AI-Assisted Customer Support & Helpdesk Automation
 
-> Minimal, cost-optimized reference implementation for the Phase 1 spec.  
-> Uses AWS CDK (Python), single Lambda router, Bedrock KB, RDS Postgres, DynamoDB.
+> Agentic, cost-optimized reference implementation.  
+> AWS CDK (Python), Step Functions orchestration, Bedrock KB + Claude 3.5, RDS Postgres, DynamoDB.
 
 ## Quick start (Windows-friendly)
 1) Create venv + install deps (PowerShell):
@@ -16,13 +16,14 @@
    - `cdk deploy --require-approval never`
 5) Check outputs for `ApiEndpoint`, `KnowledgeBaseId`, `DocumentsBucket`.
 
-## Architecture (Phase 1)
-- Single VPC (no NAT in dev) shared by RDS + Lambda.
+## Architecture
+- Single VPC (no NAT in dev) shared by RDS + Lambdas.
 - S3 bucket feeds Bedrock Knowledge Base (OpenSearch Serverless backend).
 - EventBridge rule triggers KB sync Lambda on S3 put/delete.
-- HTTP API (v2) -> single Lambda router -> thin handlers -> services.
+- HTTP API (v2) -> Lambda router -> handlers -> services.
+- Step Functions state machine: classify → retrieve → generate (fallback to in-Lambda orchestration).
 - PostgreSQL stores customer profiles/orders; DynamoDB stores interaction logs.
-- In-memory LRU caches inside Lambda to minimize DB/KB calls.
+- In-memory LRU caches to minimize DB/KB calls.
 
 ### High-level diagram
 ```mermaid
@@ -31,10 +32,16 @@ flowchart LR
     S3[KB Docs Bucket] --> EB[EventBridge Rule] --> Lsync[KB Sync Lambda] --> Bedrock[Bedrock KB]
   end
   subgraph APILayer
-    Client --> APIgw[API Gateway HTTP API] --> Lapi[Lambda Router]
+    Client --> APIgw[HTTP API] --> Lapi[Lambda Router]
     Lapi --> RDS[(Postgres)]
     Lapi --> DDB[(DynamoDB)]
     Lapi --> Bedrock
+  end
+  subgraph Agents
+    APIgw --> SFN[Step Functions]
+    SFN --> Lclass[Classify Lambda]
+    SFN --> Lret[Retrieve Lambda]
+    SFN --> Lgen[Generate Lambda]
   end
 ```
 
@@ -44,21 +51,32 @@ sequenceDiagram
   participant C as Client
   participant API as HTTP API
   participant L as Lambda Router
+  participant SF as Step Functions
   participant DB as Postgres
   participant DD as DynamoDB
   participant KB as Bedrock KB
 
-  C->>API: POST /tickets
+  C->>API: POST /tickets/auto-orchestrate
   API->>L: Proxy event
-  L->>DB: Fetch customer
-  L->>DD: Fetch interactions
-  L->>KB: Retrieve suggestions
-  L-->>API: TicketResponse JSON
+  L->>SF: start_sync_execution
+  SF->>Lclass: classify
+  SF->>Lret: retrieve context
+  Lret->>KB: Vector search
+  Lret->>DD: Similar tickets
+  L->>DB: Structured lookups
+  SF->>Lgen: generate drafts
+  Lgen-->>SF: drafts + flags
+  SF-->>L: orchestration result
+  L-->>API: Response JSON + trace
   API-->>C: 200 OK
 ```
 
 ## Endpoints
 - `POST /tickets` – ingest a ticket, return context + KB suggestions.
+- `POST /tickets/classify` – classify ticket (category/priority/department/sentiment).
+- `POST /tickets/context` – build retrieval context package from ticket + classification.
+- `POST /tickets/respond` – generate drafts with guardrail flags; optional `use_sonnet`.
+- `POST /tickets/auto-orchestrate` – run end-to-end Step Functions flow.
 - `GET /tickets/{id}/context` – return customer 360.
 - `POST /tickets/{id}/feedback` – stubbed acknowledgement.
 - `GET /health` – health check.
@@ -70,6 +88,8 @@ sequenceDiagram
 - DynamoDB on-demand + TTL on interaction logs.
 - Intelligent-Tiering hint for S3 uploads.
 - Single Lambda router to maximize cache reuse and reduce cold starts.
+- Haiku default for classification/generation; Sonnet opt-in via payload flag.
+- Caching of classification + KB retrieval to avoid duplicate Bedrock calls.
 
 ## Testing
 - Unit tests: `pytest tests/unit -v`

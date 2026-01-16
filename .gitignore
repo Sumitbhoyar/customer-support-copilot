@@ -1,12 +1,24 @@
 # Local helper scripts (keep credentials out of git)
 local-run-sample.bat
 
-# Python
+# Python artifacts
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyd
+*.pyo
+*.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
 .venv/
 env/
 venv/
@@ -17,6 +29,10 @@ coverage.xml
 .DS_Store
 .idea/
 .vscode/
+.python-version
+.envrc
+Thumbs.db
+Desktop.ini
 
 # CDK and build artifacts
 cdk.out/
@@ -26,3 +42,7 @@ cdk.out/
 # Environment files
 .env
 .env.*
+
+# Node (for CDK auxiliary tooling)
+node_modules/
+*.pyc

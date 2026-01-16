@@ -9,7 +9,16 @@ Why one Lambda?
 from typing import Callable, Dict, Tuple
 import json
 
-from . import health_check, ticket_ingestion, customer_context, kb_sync
+from . import (
+    health_check,
+    ticket_ingestion,
+    customer_context,
+    kb_sync,
+    classification,
+    retrieval,
+    response_generation,
+    orchestration,
+)
 
 
 def _response(status: int, body: Dict) -> Dict:
@@ -35,7 +44,11 @@ def lambda_handler(event, context):
     # Map route keys to handler callables. Using startswith for path params.
     route_table: Tuple[Tuple[str, Callable], ...] = (
         ("GET /health", health_check.lambda_handler),
-        ("POST /tickets/", ticket_ingestion.feedback_handler),  # more specific feedback first
+        ("POST /tickets/auto-orchestrate", orchestration.lambda_handler),
+        ("POST /tickets/respond", response_generation.lambda_handler),
+        ("POST /tickets/context", retrieval.lambda_handler),
+        ("POST /tickets/classify", classification.lambda_handler),
+        ("POST /tickets/", ticket_ingestion.feedback_handler),  # feedback path
         ("GET /tickets/", customer_context.lambda_handler),
         ("POST /tickets", ticket_ingestion.lambda_handler),
         ("POST /tickets/", ticket_ingestion.lambda_handler),  # fallback for other POST paths
