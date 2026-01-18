@@ -6,7 +6,7 @@
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
-        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:sumitbhoyar/customer-support-copilot:*"}
+        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:Sumitbhoyar/customer-support-copilot:*"}
       }
     }]
   }
