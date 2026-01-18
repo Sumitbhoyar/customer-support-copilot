@@ -2,6 +2,7 @@
   "app": "python app.py",
   "context": {
     "@aws-cdk/core:newStyleStackSynthesis": true,
+    "@aws-cdk/core:bootstrapQualifier": "ghactions",
     "aws-cdk:enableDiffNoFail": "true"
   }
 }

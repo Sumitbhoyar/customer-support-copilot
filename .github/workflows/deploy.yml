@@ -73,7 +73,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK Synth
-        run: cdk synth
+        run: cdk synth --context @aws-cdk/core:bootstrapQualifier=ghactions
 
       - name: CDK Deploy
-        run: cdk deploy --require-approval never
+        run: cdk deploy --require-approval never --context @aws-cdk/core:bootstrapQualifier=ghactions
