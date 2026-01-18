@@ -6,10 +6,14 @@ Tasks:
 - Retrieve context
 - Generate drafts with guardrail fallback
 - Return structured output
+
+Uses Docker bundling for dependencies (runs in CI/CD pipeline).
 """
 
 from aws_cdk import (
+    BundlingOptions,
     Duration,
+    Stack,
     aws_ec2 as ec2,
     aws_lambda as _lambda,
     aws_logs as logs,
@@ -28,21 +32,42 @@ class OrchestrationConstruct(Construct):
         construct_id: str,
         *,
         environment: str,
-        lambda_code: _lambda.Code,
         shared_env: dict,
         vpc: ec2.IVpc | None = None,
     ) -> None:
         super().__init__(scope, construct_id)
 
-        # Stage Lambdas reuse the same source code to keep packaging simple.
+        # AWS-managed Powertools layer
+        powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self,
+            "PowertoolsLayer",
+            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+        )
+
+        # Bundle Lambda code with dependencies using Docker
+        bundled_code = _lambda.Code.from_asset(
+            "src",
+            bundling=BundlingOptions(
+                image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                platform="linux/arm64",
+                command=[
+                    "bash", "-c",
+                    "pip install -r requirements-lambda.txt -t /asset-output && "
+                    "cp -r . /asset-output"
+                ],
+            ),
+        )
+
+        # Stage Lambdas reuse the same bundled code
         common_lambda_kwargs = dict(
             runtime=_lambda.Runtime.PYTHON_3_12,
-            code=lambda_code,
+            code=bundled_code,
             memory_size=512,
             timeout=Duration.seconds(30),
             architecture=_lambda.Architecture.ARM_64,
             log_retention=logs.RetentionDays.ONE_WEEK,
             environment=shared_env,
+            layers=[powertools_layer],
         )
         if vpc:
             common_lambda_kwargs["vpc"] = vpc

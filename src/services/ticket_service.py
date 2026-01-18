@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from src.models.ticket import TicketRequest
-from src.utils.logging_config import get_logger
+from models.ticket import TicketRequest
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

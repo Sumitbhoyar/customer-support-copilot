@@ -4,6 +4,7 @@ Event pipeline: S3 -> EventBridge -> Lambda to trigger KB sync.
 
 from aws_cdk import (
     Duration,
+    Stack,
     aws_events as events,
     aws_events_targets as targets,
     aws_lambda as _lambda,
@@ -28,12 +29,20 @@ class EventPipelineConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id)
 
+        # Use AWS-managed Powertools layer (no Docker bundling needed)
+        powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self,
+            "SyncPowertoolsLayer",
+            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+        )
+        
         self.sync_lambda = _lambda.Function(
             self,
             "KbSyncHandler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="handlers.kb_sync.lambda_handler",
             code=_lambda.Code.from_asset("src"),
+            layers=[powertools_layer],
             timeout=Duration.seconds(60),
             memory_size=256,
             architecture=_lambda.Architecture.ARM_64,

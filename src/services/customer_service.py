@@ -17,9 +17,9 @@ import boto3
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
 
-from src.models.customer import CustomerContext
-from src.utils.logging_config import get_logger
-from src.utils.cache_service import LRUCache
+from models.customer import CustomerContext
+from utils.logging_config import get_logger
+from utils.cache_service import LRUCache
 
 logger = get_logger(__name__)
 

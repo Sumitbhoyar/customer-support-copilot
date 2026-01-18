@@ -8,14 +8,24 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
-from src.models.agent import ClassificationResult, RetrievalResult, TicketInput
-from src.services.retrieval_service import RetrievalService
-from src.utils.logging_config import get_logger
+from models.agent import ClassificationResult, RetrievalResult, TicketInput
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-retriever = RetrievalService()
+
+# Lazy-loaded service to avoid import-time issues
+_retriever: Optional["RetrievalService"] = None
+
+
+def _get_retriever():
+    """Lazy-load RetrievalService."""
+    global _retriever
+    if _retriever is None:
+        from services.retrieval_service import RetrievalService
+        _retriever = RetrievalService()
+    return _retriever
 
 
 def lambda_handler(event, context) -> Dict:
@@ -37,7 +47,7 @@ def lambda_handler(event, context) -> Dict:
             payload.get("classification")
         )
 
-        retrieval: RetrievalResult = retriever.build_context(
+        retrieval: RetrievalResult = _get_retriever().build_context(
             ticket=ticket, classification=classification
         )
 

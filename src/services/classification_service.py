@@ -15,15 +15,15 @@ from typing import Optional
 
 import boto3
 
-from src.models.agent import (
+from models.agent import (
     Category,
     ClassificationResult,
     Priority,
     Sentiment,
     TicketInput,
 )
-from src.utils.cache_service import LRUCache
-from src.utils.logging_config import get_logger
+from utils.cache_service import LRUCache
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

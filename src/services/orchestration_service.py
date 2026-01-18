@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from typing import List
 
-from src.models.agent import (
+from models.agent import (
     ClassificationResult,
     GenerationResult,
     OrchestrationResult,
@@ -19,10 +19,10 @@ from src.models.agent import (
     RetrievalResult,
     TicketInput,
 )
-from src.services.classification_service import ClassificationService
-from src.services.response_service import ResponseService
-from src.services.retrieval_service import RetrievalService
-from src.utils.logging_config import get_logger
+from services.classification_service import ClassificationService
+from services.response_service import ResponseService
+from services.retrieval_service import RetrievalService
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

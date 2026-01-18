@@ -43,8 +43,8 @@ class DataLayerConstruct(Construct):
             self,
             "Postgres",
             engine=rds.DatabaseInstanceEngine.postgres(
-                # Use a widely available Postgres engine version.
-                version=rds.PostgresEngineVersion.VER_16_3
+                # Use the latest available Postgres engine version confirmed for the region.
+                version=rds.PostgresEngineVersion.VER_18_1
             ),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),

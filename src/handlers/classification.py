@@ -9,14 +9,24 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
-from src.models.agent import ClassificationResult, TicketInput
-from src.services.classification_service import ClassificationService
-from src.utils.logging_config import get_logger
+from models.agent import ClassificationResult, TicketInput
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-classifier = ClassificationService()
+
+# Lazy-loaded service to avoid import-time issues
+_classifier: Optional["ClassificationService"] = None
+
+
+def _get_classifier():
+    """Lazy-load ClassificationService."""
+    global _classifier
+    if _classifier is None:
+        from services.classification_service import ClassificationService
+        _classifier = ClassificationService()
+    return _classifier
 
 
 def lambda_handler(event, context) -> Dict:
@@ -36,7 +46,7 @@ def lambda_handler(event, context) -> Dict:
         else:
             payload = event
         ticket = TicketInput.model_validate(payload)
-        result: ClassificationResult = classifier.classify(ticket)
+        result: ClassificationResult = _get_classifier().classify(ticket)
 
         logger.info(
             "Ticket classified",

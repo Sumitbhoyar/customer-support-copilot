@@ -6,7 +6,7 @@ import json
 import os
 import boto3
 
-from src.utils.logging_config import get_logger
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 client = boto3.client("bedrock-agent")

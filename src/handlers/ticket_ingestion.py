@@ -11,18 +11,34 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
-from src.models.ticket import TicketRequest, TicketResponse
-from src.services.customer_service import CustomerService
-from src.services.bedrock_service import BedrockService
-from src.utils.logging_config import get_logger
+from models.ticket import TicketRequest, TicketResponse
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-customer_service = CustomerService()
-bedrock_service = BedrockService(
-    knowledge_base_id=None  # Set at runtime via env in handler below
-)
+
+# Lazy-loaded services to avoid import-time DB connections
+_customer_service: Optional["CustomerService"] = None
+_bedrock_service: Optional["BedrockService"] = None
+
+
+def _get_customer_service():
+    """Lazy-load CustomerService."""
+    global _customer_service
+    if _customer_service is None:
+        from services.customer_service import CustomerService
+        _customer_service = CustomerService()
+    return _customer_service
+
+
+def _get_bedrock_service():
+    """Lazy-load BedrockService."""
+    global _bedrock_service
+    if _bedrock_service is None:
+        from services.bedrock_service import BedrockService
+        _bedrock_service = BedrockService(knowledge_base_id=None)
+    return _bedrock_service
 
 
 def lambda_handler(event, context):
@@ -35,7 +51,7 @@ def lambda_handler(event, context):
         ticket = TicketRequest.model_validate(payload)
 
         # Fetch customer context (uses cache + DB/DynamoDB).
-        customer_context = customer_service.get_customer_context(
+        customer_context = _get_customer_service().get_customer_context(
             ticket.customer_external_id
         )
 
@@ -43,7 +59,7 @@ def lambda_handler(event, context):
         suggestions = []
         if customer_context:
             query = f"{ticket.subject}\n\n{ticket.description}"
-            suggestions = bedrock_service.retrieve(query, max_results=3)
+            suggestions = _get_bedrock_service().retrieve(query, max_results=3)
 
         response = TicketResponse(
             ticket_id=ticket.ticket_id,

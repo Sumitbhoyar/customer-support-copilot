@@ -2,9 +2,11 @@
 API layer construct: shared Lambda + HTTP API routes.
 
 A single Lambda keeps warm caches and reduces cold start costs.
+Uses Docker bundling for dependencies (runs in CI/CD pipeline).
 """
 
 from aws_cdk import (
+    BundlingOptions,
     Duration,
     aws_ec2 as ec2,
     aws_lambda as _lambda,
@@ -34,13 +36,35 @@ class ApiLayerConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id)
 
-        # Main Lambda that routes based on HTTP path/method.
+        # AWS-managed Powertools layer (includes pydantic, boto3 extras)
+        powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self,
+            "PowertoolsLayer",
+            f"arn:aws:lambda:{scope.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+        )
+
+        # Bundle Lambda code with dependencies using Docker (works in CI/CD)
+        # Installs sqlalchemy, psycopg2-binary for database access
+        bundled_code = _lambda.Code.from_asset(
+            "src",
+            bundling=BundlingOptions(
+                image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                platform="linux/arm64",
+                command=[
+                    "bash", "-c",
+                    "pip install -r requirements-lambda.txt -t /asset-output && "
+                    "cp -r . /asset-output"
+                ],
+            ),
+        )
+
         self.main_lambda = _lambda.Function(
             self,
             "ApiHandler",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="handlers.main.lambda_handler",
-            code=_lambda.Code.from_asset("src"),
+            code=bundled_code,
+            layers=[powertools_layer],
             memory_size=lambda_memory_mb,
             timeout=Duration.seconds(lambda_timeout_seconds),
             architecture=_lambda.Architecture.ARM_64,

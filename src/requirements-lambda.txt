@@ -1,0 +1,5 @@
+# Lambda-specific dependencies (bundled with Docker in CI/CD)
+# Keep minimal to reduce package size and cold start time
+
+sqlalchemy>=2.0.36
+psycopg2-binary>=2.9.10

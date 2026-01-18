@@ -6,7 +6,7 @@ from aws_cdk import (
     Stack,
     Tags,
     CfnOutput,
-    aws_lambda as _lambda,
+    aws_iam as iam,
 )
 from constructs import Construct
 
@@ -71,11 +71,11 @@ class AISupportStack(Stack):
         )
 
         # 3b) Orchestration (Step Functions + stage Lambdas).
+        # Uses Docker bundling internally for dependencies
         orchestration_construct = OrchestrationConstruct(
             self,
             "AgenticOrchestration",
             environment=settings.environment,
-            lambda_code=_lambda.Code.from_asset("src"),
             shared_env={
                 "ENVIRONMENT": settings.environment,
                 "KNOWLEDGE_BASE_ID": kb_construct.knowledge_base.attr_knowledge_base_id,
@@ -104,6 +104,22 @@ class AISupportStack(Stack):
         kb_construct.documents_bucket.grant_read(api_construct.main_lambda)
         data_construct.db_secret.grant_read(api_construct.main_lambda)
         data_construct.interactions_table.grant_read_write_data(api_construct.main_lambda)
+        
+        # Bedrock permissions for all Lambdas that call AI models
+        bedrock_policy = iam.PolicyStatement(
+            actions=[
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+                "bedrock-agent-runtime:Retrieve",
+                "bedrock-agent-runtime:RetrieveAndGenerate",
+            ],
+            resources=["*"],
+        )
+        api_construct.main_lambda.add_to_role_policy(bedrock_policy)
+        orchestration_construct.classify_fn.add_to_role_policy(bedrock_policy)
+        orchestration_construct.retrieve_fn.add_to_role_policy(bedrock_policy)
+        orchestration_construct.respond_fn.add_to_role_policy(bedrock_policy)
+        
         # Permissions for orchestration stage Lambdas.
         kb_construct.documents_bucket.grant_read(orchestration_construct.retrieve_fn)
         data_construct.db_secret.grant_read(orchestration_construct.classify_fn)
@@ -121,3 +137,4 @@ class AISupportStack(Stack):
             "StateMachineArn",
             value=orchestration_construct.state_machine.state_machine_arn,
         )
+        CfnOutput(self, "CollectionEndpoint", value=kb_construct.aoss_collection.attr_collection_endpoint)

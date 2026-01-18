@@ -1,12 +1,23 @@
 """Handler for GET /tickets/{id}/context."""
 
 import json
+from typing import Optional
 
-from src.services.customer_service import CustomerService
-from src.utils.logging_config import get_logger
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-customer_service = CustomerService()
+
+# Lazy-loaded service to avoid import-time DB connections
+_customer_service: Optional["CustomerService"] = None
+
+
+def _get_customer_service():
+    """Lazy-load CustomerService."""
+    global _customer_service
+    if _customer_service is None:
+        from services.customer_service import CustomerService
+        _customer_service = CustomerService()
+    return _customer_service
 
 
 def lambda_handler(event, context):
@@ -22,7 +33,7 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": "customer_external_id is required"}),
         }
 
-    context_obj = customer_service.get_customer_context(external_id)
+    context_obj = _get_customer_service().get_customer_context(external_id)
     if not context_obj:
         return {
             "statusCode": 404,

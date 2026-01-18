@@ -1,0 +1,32 @@
+[
+    {
+        "Rules": [
+            {
+                "Resource": ["collection/kb-dev"],
+                "Permission": [
+                    "aoss:CreateCollectionItems",
+                    "aoss:UpdateCollectionItems",
+                    "aoss:DescribeCollectionItems"
+                ],
+                "ResourceType": "collection"
+            },
+            {
+                "Resource": ["index/kb-dev/*"],
+                "Permission": [
+                    "aoss:CreateIndex",
+                    "aoss:DescribeIndex",
+                    "aoss:ReadDocument",
+                    "aoss:WriteDocument",
+                    "aoss:UpdateIndex",
+                    "aoss:DeleteIndex"
+                ],
+                "ResourceType": "index"
+            }
+        ],
+        "Principal": [
+            "arn:aws:iam::602320639652:role/bedrock-kb-dev",
+            "arn:aws:iam::602320639652:user/sumit-bhoyar"
+        ],
+        "Description": "Data access for Bedrock KB and deploy user"
+    }
+]

@@ -3,16 +3,54 @@
 > Agentic, cost-optimized reference implementation.  
 > AWS CDK (Python), Step Functions orchestration, Bedrock KB + Claude 3.5, RDS Postgres, DynamoDB.
 
-## Quick start (Windows-friendly)
+## Quick start (CI/CD - Recommended)
+
+**Deployment via GitHub Actions (recommended)** - avoids needing Docker locally:
+
+1) Push this repo to GitHub
+2) Configure GitHub repository secrets:
+   - `AWS_DEPLOY_ROLE_ARN` - IAM role ARN for OIDC (see setup below)
+3) Push to `main` branch → automatic deployment
+
+### One-time AWS OIDC setup for GitHub Actions
+```bash
+# Create OIDC provider (run once per AWS account)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+
+# Create IAM role for GitHub Actions (replace YOUR_GITHUB_ORG/REPO)
+aws iam create-role --role-name GitHubActionsDeployRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Federated": "arn:aws:iam::YOUR_ACCOUNT:oidc-provider/token.actions.githubusercontent.com"},
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
+        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:YOUR_GITHUB_ORG/REPO:*"}
+      }
+    }]
+  }'
+
+# Attach AdministratorAccess (or scoped policy) to the role
+aws iam attach-role-policy --role-name GitHubActionsDeployRole \
+  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+```
+
+## Quick start (Local - requires Docker)
+
 1) Create venv + install deps (PowerShell):
    - `py -m venv .venv`
    - `.\.venv\Scripts\Activate.ps1`
    - `pip install -r requirements.txt`
-2) Prereqs: install AWS CLI v2, Node.js 18+, `npm install -g aws-cdk`.
-3) Bootstrap CDK (first time, use eu-west-2): `cdk bootstrap aws://YOUR_ACCOUNT/eu-west-2`
+2) Prereqs: install AWS CLI v2, Node.js 18+, Docker Desktop, `npm install -g aws-cdk`.
+3) Bootstrap CDK (first time): `cdk bootstrap aws://YOUR_ACCOUNT/eu-west-2`
 4) Deploy (dev):
    - `$env:ENVIRONMENT="dev"`
-   - `$env:AWS_REGION="eu-west-2"`  # Default region
+   - `$env:AWS_REGION="eu-west-2"`
    - `cdk deploy --require-approval never`
 5) Check outputs for `ApiEndpoint`, `KnowledgeBaseId`, `DocumentsBucket`.
 

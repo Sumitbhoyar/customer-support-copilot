@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
-from src.models.customer import CustomerContext
-from src.models.knowledge import KBSuggestion
+from models.customer import CustomerContext
+from models.knowledge import KBSuggestion
 
 
 class TicketRequest(BaseModel):

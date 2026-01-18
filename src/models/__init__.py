@@ -1,6 +1,6 @@
 """Pydantic models for API payloads."""
 
-from src.models.agent import (  # noqa: F401
+from models.agent import (  # noqa: F401
     Category,
     ClassificationResult,
     GenerationResult,
@@ -14,7 +14,7 @@ from src.models.agent import (  # noqa: F401
     Sentiment,
     TicketInput,
 )
-from src.models.customer import CustomerContext  # noqa: F401
-from src.models.knowledge import KBQuery, KBResult, KBSuggestion  # noqa: F401
-from src.models.response import ApiResponse  # noqa: F401
-from src.models.ticket import TicketRequest, TicketResponse  # noqa: F401
+from models.customer import CustomerContext  # noqa: F401
+from models.knowledge import KBQuery, KBResult, KBSuggestion  # noqa: F401
+from models.response import ApiResponse  # noqa: F401
+from models.ticket import TicketRequest, TicketResponse  # noqa: F401

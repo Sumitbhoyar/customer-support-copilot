@@ -12,16 +12,16 @@ from __future__ import annotations
 import time
 from typing import List
 
-from src.models.agent import (
+from models.agent import (
     ClassificationResult,
     RetrievalContextItem,
     RetrievalResult,
     TicketInput,
 )
-from src.models.knowledge import KBResult
-from src.services.bedrock_service import BedrockService
-from src.services.customer_service import CustomerService
-from src.utils.logging_config import get_logger
+from models.knowledge import KBResult
+from services.bedrock_service import BedrockService
+from services.customer_service import CustomerService
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

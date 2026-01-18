@@ -8,19 +8,29 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
-from src.models.agent import (
+from models.agent import (
     ClassificationResult,
     GenerationResult,
     RetrievalResult,
     TicketInput,
 )
-from src.services.response_service import ResponseService
-from src.utils.logging_config import get_logger
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-responder = ResponseService()
+
+# Lazy-loaded service to avoid import-time issues
+_responder: Optional["ResponseService"] = None
+
+
+def _get_responder():
+    """Lazy-load ResponseService."""
+    global _responder
+    if _responder is None:
+        from services.response_service import ResponseService
+        _responder = ResponseService()
+    return _responder
 
 
 def lambda_handler(event, context) -> Dict:
@@ -43,7 +53,7 @@ def lambda_handler(event, context) -> Dict:
         retrieval = RetrievalResult.model_validate(payload.get("context"))
         use_sonnet = bool(payload.get("use_sonnet", False))
 
-        generation: GenerationResult = responder.generate_response(
+        generation: GenerationResult = _get_responder().generate_response(
             ticket=ticket,
             classification=classification,
             retrieval=retrieval,

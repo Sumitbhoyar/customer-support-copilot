@@ -10,17 +10,35 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
 import boto3
 
-from src.models.agent import OrchestrationResult, TicketInput
-from src.services.orchestration_service import OrchestrationService
-from src.utils.logging_config import get_logger
+from models.agent import OrchestrationResult, TicketInput
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-orchestrator = OrchestrationService()
-sfn_client = boto3.client("stepfunctions")
+
+# Lazy-loaded service and client to avoid import-time issues
+_orchestrator: Optional["OrchestrationService"] = None
+_sfn_client = None
+
+
+def _get_orchestrator():
+    """Lazy-load OrchestrationService."""
+    global _orchestrator
+    if _orchestrator is None:
+        from services.orchestration_service import OrchestrationService
+        _orchestrator = OrchestrationService()
+    return _orchestrator
+
+
+def _get_sfn_client():
+    """Lazy-load Step Functions client."""
+    global _sfn_client
+    if _sfn_client is None:
+        _sfn_client = boto3.client("stepfunctions")
+    return _sfn_client
 
 
 def lambda_handler(event, context) -> Dict:
@@ -40,7 +58,7 @@ def lambda_handler(event, context) -> Dict:
                 "ticket": ticket.model_dump(mode="json"),
                 "correlation_id": correlation_id,
             }
-            execution = sfn_client.start_sync_execution(
+            execution = _get_sfn_client().start_sync_execution(
                 stateMachineArn=state_machine_arn,
                 name=f"exec-{correlation_id}",
                 input=json.dumps(execution_input),
@@ -49,7 +67,7 @@ def lambda_handler(event, context) -> Dict:
             result = OrchestrationResult.model_validate(output)
         else:
             # In dev/local we orchestrate synchronously inside this Lambda.
-            result = orchestrator.run(ticket=ticket, correlation_id=correlation_id)
+            result = _get_orchestrator().run(ticket=ticket, correlation_id=correlation_id)
 
         logger.info(
             "Orchestration complete",

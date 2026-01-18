@@ -14,7 +14,7 @@ from typing import List
 
 import boto3
 
-from src.models.agent import (
+from models.agent import (
     ClassificationResult,
     GenerationResult,
     ResponseDraft,
@@ -22,7 +22,7 @@ from src.models.agent import (
     SafetyFlag,
     TicketInput,
 )
-from src.utils.logging_config import get_logger
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

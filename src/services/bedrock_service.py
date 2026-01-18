@@ -12,8 +12,8 @@ from typing import List, Optional
 
 import boto3
 
-from src.models.knowledge import KBResult
-from src.utils.logging_config import get_logger
+from models.knowledge import KBResult
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
