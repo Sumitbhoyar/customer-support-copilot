@@ -29,11 +29,12 @@ class EventPipelineConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id)
 
-        # Use AWS-managed Powertools layer (no Docker bundling needed)
+        # Use AWS-managed Powertools layer
+        # Using x86_64 for CI/CD compatibility (GitHub runners are x86_64)
         powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
             self,
             "SyncPowertoolsLayer",
-            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86:7"
         )
         
         self.sync_lambda = _lambda.Function(
@@ -45,7 +46,7 @@ class EventPipelineConstruct(Construct):
             layers=[powertools_layer],
             timeout=Duration.seconds(60),
             memory_size=256,
-            architecture=_lambda.Architecture.ARM_64,
+            architecture=_lambda.Architecture.X86_64,
             environment={
                 "ENVIRONMENT": environment,
                 "KNOWLEDGE_BASE_ID": knowledge_base_id,

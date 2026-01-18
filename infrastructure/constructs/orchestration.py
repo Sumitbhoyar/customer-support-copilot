@@ -38,10 +38,11 @@ class OrchestrationConstruct(Construct):
         super().__init__(scope, construct_id)
 
         # AWS-managed Powertools layer
+        # Using x86_64 for CI/CD compatibility (GitHub runners are x86_64)
         powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
             self,
             "PowertoolsLayer",
-            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+            f"arn:aws:lambda:{Stack.of(self).region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86:7"
         )
 
         # Bundle Lambda code with dependencies using Docker
@@ -49,7 +50,6 @@ class OrchestrationConstruct(Construct):
             "src",
             bundling=BundlingOptions(
                 image=_lambda.Runtime.PYTHON_3_12.bundling_image,
-                platform="linux/arm64",
                 command=[
                     "bash", "-c",
                     "pip install -r requirements-lambda.txt -t /asset-output && "
@@ -64,7 +64,7 @@ class OrchestrationConstruct(Construct):
             code=bundled_code,
             memory_size=512,
             timeout=Duration.seconds(30),
-            architecture=_lambda.Architecture.ARM_64,
+            architecture=_lambda.Architecture.X86_64,
             log_retention=logs.RetentionDays.ONE_WEEK,
             environment=shared_env,
             layers=[powertools_layer],

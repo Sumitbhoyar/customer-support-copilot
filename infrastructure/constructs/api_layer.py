@@ -37,10 +37,11 @@ class ApiLayerConstruct(Construct):
         super().__init__(scope, construct_id)
 
         # AWS-managed Powertools layer (includes pydantic, boto3 extras)
+        # Using x86_64 for CI/CD compatibility (GitHub runners are x86_64)
         powertools_layer = _lambda.LayerVersion.from_layer_version_arn(
             self,
             "PowertoolsLayer",
-            f"arn:aws:lambda:{scope.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+            f"arn:aws:lambda:{scope.region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86:7"
         )
 
         # Bundle Lambda code with dependencies using Docker (works in CI/CD)
@@ -49,7 +50,6 @@ class ApiLayerConstruct(Construct):
             "src",
             bundling=BundlingOptions(
                 image=_lambda.Runtime.PYTHON_3_12.bundling_image,
-                platform="linux/arm64",
                 command=[
                     "bash", "-c",
                     "pip install -r requirements-lambda.txt -t /asset-output && "
@@ -67,7 +67,7 @@ class ApiLayerConstruct(Construct):
             layers=[powertools_layer],
             memory_size=lambda_memory_mb,
             timeout=Duration.seconds(lambda_timeout_seconds),
-            architecture=_lambda.Architecture.ARM_64,
+            architecture=_lambda.Architecture.X86_64,
             vpc=vpc,
             environment={
                 "ENVIRONMENT": environment,
