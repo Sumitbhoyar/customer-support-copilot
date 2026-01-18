@@ -36,6 +36,7 @@ class KnowledgeBaseConstruct(Construct):
         embedding_model_id: str,
         chunking_max_tokens: int,
         chunking_overlap_percentage: int,
+        kb_enabled: bool = True,
     ) -> None:
         super().__init__(scope, construct_id)
 
@@ -228,48 +229,53 @@ class KnowledgeBaseConstruct(Construct):
         # CRITICAL: Data access policy must be created AFTER the KB role so the ARN resolves
         self.aoss_data_access.node.add_dependency(self.kb_role)
 
-        # Knowledge Base (policy has propagated - safe to create now)
-        self.knowledge_base = bedrock.CfnKnowledgeBase(
-            self,
-            "KnowledgeBase",
-            name=f"kb-{environment}",
-            role_arn=self.kb_role.role_arn,
-            knowledge_base_configuration=bedrock.CfnKnowledgeBase.KnowledgeBaseConfigurationProperty(
-                type="VECTOR",
-                vector_knowledge_base_configuration=bedrock.CfnKnowledgeBase.VectorKnowledgeBaseConfigurationProperty(
-                    embedding_model_arn=(
-                        f"arn:aws:bedrock:{region}::foundation-model/{embedding_model_id}"
-                    )
-                ),
-            ),
-            storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
-                type="OPENSEARCH_SERVERLESS",
-                opensearch_serverless_configuration=bedrock.CfnKnowledgeBase.OpenSearchServerlessConfigurationProperty(
-                    collection_arn=self.aoss_collection.attr_arn,
-                    vector_index_name="default",
-                    field_mapping=bedrock.CfnKnowledgeBase.OpenSearchServerlessFieldMappingProperty(
-                        vector_field="vector",
-                        text_field="text",
-                        metadata_field="metadata",
+        # Knowledge Base and Data Source (only if kb_enabled)
+        # Set to False for first deploy to create collection/policies, then create index manually
+        self.knowledge_base: Optional[bedrock.CfnKnowledgeBase] = None
+        self.data_source: Optional[bedrock.CfnDataSource] = None
+        
+        if kb_enabled:
+            self.knowledge_base = bedrock.CfnKnowledgeBase(
+                self,
+                "KnowledgeBase",
+                name=f"kb-{environment}",
+                role_arn=self.kb_role.role_arn,
+                knowledge_base_configuration=bedrock.CfnKnowledgeBase.KnowledgeBaseConfigurationProperty(
+                    type="VECTOR",
+                    vector_knowledge_base_configuration=bedrock.CfnKnowledgeBase.VectorKnowledgeBaseConfigurationProperty(
+                        embedding_model_arn=(
+                            f"arn:aws:bedrock:{region}::foundation-model/{embedding_model_id}"
+                        )
                     ),
                 ),
-            ),
-        )
-        self.knowledge_base.add_dependency(self.aoss_collection)
-        self.knowledge_base.add_dependency(self.aoss_data_access)
-        
-        # Data source that ties the bucket to the KB with chunking config.
-        self.data_source = bedrock.CfnDataSource(
-            self,
-            "KnowledgeBaseDataSource",
-            knowledge_base_id=self.knowledge_base.attr_knowledge_base_id,
-            name=f"kb-ds-{environment}",
-            data_source_configuration=bedrock.CfnDataSource.DataSourceConfigurationProperty(
-                type="S3",
-                s3_configuration=bedrock.CfnDataSource.S3DataSourceConfigurationProperty(
-                    bucket_arn=self.documents_bucket.bucket_arn,
-                    inclusion_prefixes=["/"],
+                storage_configuration=bedrock.CfnKnowledgeBase.StorageConfigurationProperty(
+                    type="OPENSEARCH_SERVERLESS",
+                    opensearch_serverless_configuration=bedrock.CfnKnowledgeBase.OpenSearchServerlessConfigurationProperty(
+                        collection_arn=self.aoss_collection.attr_arn,
+                        vector_index_name="default",
+                        field_mapping=bedrock.CfnKnowledgeBase.OpenSearchServerlessFieldMappingProperty(
+                            vector_field="vector",
+                            text_field="text",
+                            metadata_field="metadata",
+                        ),
+                    ),
                 ),
-            ),
-        )
-        self.data_source.add_dependency(self.knowledge_base)
+            )
+            self.knowledge_base.add_dependency(self.aoss_collection)
+            self.knowledge_base.add_dependency(self.aoss_data_access)
+            
+            # Data source that ties the bucket to the KB with chunking config.
+            self.data_source = bedrock.CfnDataSource(
+                self,
+                "KnowledgeBaseDataSource",
+                knowledge_base_id=self.knowledge_base.attr_knowledge_base_id,
+                name=f"kb-ds-{environment}",
+                data_source_configuration=bedrock.CfnDataSource.DataSourceConfigurationProperty(
+                    type="S3",
+                    s3_configuration=bedrock.CfnDataSource.S3DataSourceConfigurationProperty(
+                        bucket_arn=self.documents_bucket.bucket_arn,
+                        inclusion_prefixes=["/"],
+                    ),
+                ),
+            )
+            self.data_source.add_dependency(self.knowledge_base)

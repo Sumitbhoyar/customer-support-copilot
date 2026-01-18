@@ -1,0 +1,4 @@
+[{
+  "Rules": [{"Resource": ["collection/kb-dev"], "ResourceType": "collection"}],
+  "AllowFromPublic": true
+}]

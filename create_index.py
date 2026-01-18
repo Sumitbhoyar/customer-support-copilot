@@ -5,23 +5,21 @@ import boto3
 import sys
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
+REGION = 'eu-west-2'
+# Collection endpoint from: aws opensearchserverless list-collections
+# Collection ID: e9b9f5fjv0ad5dd585f
+COLLECTION_ENDPOINT = 'e9b9f5fjv0ad5dd585f.eu-west-2.aoss.amazonaws.com'
+
 def main():
-    # Get collection endpoint from CloudFormation
-    cf = boto3.client('cloudformation', region_name='eu-west-2')
-    try:
-        resp = cf.describe_stacks(StackName='AISupportStack-dev')
-        outputs = {o['OutputKey']: o['OutputValue'] for o in resp['Stacks'][0]['Outputs']}
-        collection_endpoint = outputs['CollectionEndpoint'].replace('https://', '')
-    except Exception as e:
-        print(f"Error getting collection endpoint: {e}")
-        sys.exit(1)
+    collection_endpoint = COLLECTION_ENDPOINT
+    print(f"Using collection endpoint: {collection_endpoint}")
 
     print(f"Creating index on collection: {collection_endpoint}")
 
     # Get credentials
     session = boto3.Session()
     credentials = session.get_credentials()
-    auth = AWSV4SignerAuth(credentials, 'eu-west-2', 'aoss')
+    auth = AWSV4SignerAuth(credentials, REGION, 'aoss')
 
     # Create client
     client = OpenSearch(

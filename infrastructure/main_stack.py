@@ -38,6 +38,7 @@ class AISupportStack(Stack):
         Tags.of(self).add("ManagedBy", "cdk")
 
         # 1) Knowledge Base + shared VPC.
+        # Set KB_ENABLED=false for first deploy, create index manually, then redeploy
         kb_construct = KnowledgeBaseConstruct(
             self,
             "KnowledgeBase",
@@ -45,6 +46,7 @@ class AISupportStack(Stack):
             embedding_model_id=settings.embedding_model_id,
             chunking_max_tokens=settings.chunking_max_tokens,
             chunking_overlap_percentage=settings.chunking_overlap_percentage,
+            kb_enabled=settings.kb_enabled,
         )
 
         # 2) Data layer.
@@ -57,12 +59,14 @@ class AISupportStack(Stack):
         )
 
         # 3) API layer (single Lambda).
+        # Knowledge base ID is optional - set to placeholder if KB not enabled
+        kb_id = kb_construct.knowledge_base.attr_knowledge_base_id if kb_construct.knowledge_base else "KB_NOT_ENABLED"
         api_construct = ApiLayerConstruct(
             self,
             "ApiLayer",
             environment=settings.environment,
             vpc=kb_construct.vpc,
-            knowledge_base_id=kb_construct.knowledge_base.attr_knowledge_base_id,
+            knowledge_base_id=kb_id,
             db_secret_arn=data_construct.db_secret.secret_arn,
             interactions_table_name=data_construct.interactions_table.table_name,
             model_id=settings.model_id,
@@ -78,7 +82,7 @@ class AISupportStack(Stack):
             environment=settings.environment,
             shared_env={
                 "ENVIRONMENT": settings.environment,
-                "KNOWLEDGE_BASE_ID": kb_construct.knowledge_base.attr_knowledge_base_id,
+                "KNOWLEDGE_BASE_ID": kb_id,
                 "DB_SECRET_ARN": data_construct.db_secret.secret_arn,
                 "INTERACTIONS_TABLE": data_construct.interactions_table.table_name,
                 "MODEL_ID": settings.model_id,
@@ -90,15 +94,17 @@ class AISupportStack(Stack):
             "STATE_MACHINE_ARN", orchestration_construct.state_machine.state_machine_arn
         )
 
-        # 4) Event pipeline to sync KB on document changes.
-        event_construct = EventPipelineConstruct(
-            self,
-            "EventPipeline",
-            environment=settings.environment,
-            documents_bucket=kb_construct.documents_bucket,
-            knowledge_base_id=kb_construct.knowledge_base.attr_knowledge_base_id,
-            data_source_id=kb_construct.data_source.attr_data_source_id,
-        )
+        # 4) Event pipeline to sync KB on document changes (only if KB enabled).
+        event_construct = None
+        if settings.kb_enabled and kb_construct.knowledge_base and kb_construct.data_source:
+            event_construct = EventPipelineConstruct(
+                self,
+                "EventPipeline",
+                environment=settings.environment,
+                documents_bucket=kb_construct.documents_bucket,
+                knowledge_base_id=kb_construct.knowledge_base.attr_knowledge_base_id,
+                data_source_id=kb_construct.data_source.attr_data_source_id,
+            )
 
         # Permissions for the API Lambda.
         kb_construct.documents_bucket.grant_read(api_construct.main_lambda)
@@ -129,7 +135,6 @@ class AISupportStack(Stack):
 
         # Outputs to quickly find resources.
         CfnOutput(self, "ApiEndpoint", value=api_construct.api.api_endpoint)
-        CfnOutput(self, "KnowledgeBaseId", value=kb_construct.knowledge_base.attr_knowledge_base_id)
         CfnOutput(self, "DocumentsBucket", value=kb_construct.documents_bucket.bucket_name)
         CfnOutput(self, "InteractionsTable", value=data_construct.interactions_table.table_name)
         CfnOutput(
@@ -138,3 +143,7 @@ class AISupportStack(Stack):
             value=orchestration_construct.state_machine.state_machine_arn,
         )
         CfnOutput(self, "CollectionEndpoint", value=kb_construct.aoss_collection.attr_collection_endpoint)
+        
+        # KB-specific outputs (only if KB enabled)
+        if kb_construct.knowledge_base:
+            CfnOutput(self, "KnowledgeBaseId", value=kb_construct.knowledge_base.attr_knowledge_base_id)
