@@ -1,19 +1,21 @@
+"""
+Tests for ticket ingestion handler.
+"""
 import json
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.handlers import ticket_ingestion
-from src.models.customer import CustomerContext
-from src.models.knowledge import KBSuggestion
+# Add src to path
+SRC_PATH = Path(__file__).parent.parent.parent / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
 
-
-@pytest.fixture(autouse=True)
-def reset_mocks(monkeypatch):
-    """Reset handler singletons between tests."""
-    # Fresh suggestion cache per test
-    ticket_ingestion.bedrock_service._cache.clear()
-    yield
+from models.customer import CustomerContext
+from models.knowledge import KBSuggestion
 
 
 def _sample_customer_context() -> CustomerContext:
@@ -36,38 +38,44 @@ def _sample_customer_context() -> CustomerContext:
     )
 
 
-def test_ticket_ingestion_happy_path(monkeypatch):
+def test_ticket_ingestion_happy_path():
     """Ticket ingestion returns context and suggestions."""
-    # Mock customer context and KB suggestions
-    monkeypatch.setattr(
-        ticket_ingestion.customer_service,
-        "get_customer_context",
-        lambda external_id: _sample_customer_context(),
-    )
+    from handlers import ticket_ingestion
+    
+    # Reset lazy-loaded services
+    ticket_ingestion._customer_service = None
+    ticket_ingestion._bedrock_service = None
+    
+    # Mock customer service
+    mock_customer_service = MagicMock()
+    mock_customer_service.get_customer_context.return_value = _sample_customer_context()
+    
+    # Mock bedrock service
     suggestion = KBSuggestion(
         content="Reset the router and retry.",
         score=0.87,
         source="s3://kb/docs/troubleshooting.md",
         metadata={"section": "network"},
     )
-    monkeypatch.setattr(
-        ticket_ingestion.bedrock_service, "retrieve", lambda q, max_results=3: [suggestion]
-    )
+    mock_bedrock_service = MagicMock()
+    mock_bedrock_service.retrieve.return_value = [suggestion]
+    
+    with patch.object(ticket_ingestion, '_get_customer_service', return_value=mock_customer_service):
+        with patch.object(ticket_ingestion, '_get_bedrock_service', return_value=mock_bedrock_service):
+            payload = {
+                "ticket_id": "t-1",
+                "external_ticket_id": "ext-1",
+                "customer_external_id": "cust-ext-1",
+                "subject": "Network issue",
+                "description": "Cannot connect to VPN",
+                "channel": "email",
+                "priority": "high",
+                "metadata": {"region": "EU"},
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
 
-    payload = {
-        "ticket_id": "t-1",
-        "external_ticket_id": "ext-1",
-        "customer_external_id": "cust-ext-1",
-        "subject": "Network issue",
-        "description": "Cannot connect to VPN",
-        "channel": "email",
-        "priority": "high",
-        "metadata": {"region": "EU"},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    event = {"body": json.dumps(payload)}
-    resp = ticket_ingestion.lambda_handler(event, None)
+            event = {"body": json.dumps(payload)}
+            resp = ticket_ingestion.lambda_handler(event, None)
 
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
@@ -81,6 +89,8 @@ def test_ticket_ingestion_happy_path(monkeypatch):
 
 def test_ticket_ingestion_bad_payload_returns_400():
     """Invalid payload should produce a 400 with an error message."""
+    from handlers import ticket_ingestion
+    
     event = {"body": json.dumps({"ticket_id": "missing_fields_only"})}
     resp = ticket_ingestion.lambda_handler(event, None)
     assert resp["statusCode"] == 400

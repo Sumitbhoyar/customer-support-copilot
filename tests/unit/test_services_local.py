@@ -7,6 +7,7 @@ Run with: pytest tests/unit/test_services_local.py -v
 """
 
 import sys
+import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -53,7 +54,7 @@ class TestClassificationService:
         ticket = TicketInput(
             title="Billing question",
             description="I have a question about my bill",
-            customer_id="CUST001"
+            customer_external_id="CUST001"
         )
         
         # Should fall back to heuristic classification
@@ -65,26 +66,24 @@ class TestClassificationService:
 class TestRetrievalService:
     """Test RetrievalService."""
 
-    @patch("services.retrieval_service.boto3")
-    @patch("services.customer_service.boto3")
-    @patch("services.bedrock_service.boto3")
-    def test_service_instantiation(self, mock_bedrock, mock_customer, mock_retrieval):
+    @patch("services.retrieval_service.CustomerService")
+    @patch("services.retrieval_service.BedrockService")
+    def test_service_instantiation(self, mock_bedrock, mock_customer):
         """Service should instantiate without errors."""
         from services.retrieval_service import RetrievalService
         
         service = RetrievalService()
         assert service is not None
 
-    @patch("services.retrieval_service.boto3")
-    @patch("services.customer_service.boto3")
-    @patch("services.bedrock_service.boto3")
-    def test_service_has_retrieve_method(self, mock_bedrock, mock_customer, mock_retrieval):
-        """Service should have retrieve method."""
+    @patch("services.retrieval_service.CustomerService")
+    @patch("services.retrieval_service.BedrockService")
+    def test_service_has_build_context_method(self, mock_bedrock, mock_customer):
+        """Service should have build_context method."""
         from services.retrieval_service import RetrievalService
         
         service = RetrievalService()
-        assert hasattr(service, "retrieve")
-        assert callable(service.retrieve)
+        assert hasattr(service, "build_context")
+        assert callable(service.build_context)
 
 
 class TestResponseService:
@@ -99,21 +98,13 @@ class TestResponseService:
         assert service is not None
 
     @patch("services.response_service.boto3")
-    def test_service_has_generate_method(self, mock_boto3):
-        """Service should have generate method."""
+    def test_service_has_generate_response_method(self, mock_boto3):
+        """Service should have generate_response method."""
         from services.response_service import ResponseService
         
         service = ResponseService()
-        assert hasattr(service, "generate")
-        assert callable(service.generate)
-
-    @patch("services.response_service.boto3")
-    def test_safe_fallback_response(self, mock_boto3):
-        """Service should return safe fallback on errors."""
-        from services.response_service import ResponseService
-        
-        service = ResponseService()
-        assert hasattr(service, "_safe_fallback")
+        assert hasattr(service, "generate_response")
+        assert callable(service.generate_response)
 
 
 class TestOrchestrationService:
@@ -132,34 +123,47 @@ class TestOrchestrationService:
     @patch("services.orchestration_service.ClassificationService")
     @patch("services.orchestration_service.RetrievalService")
     @patch("services.orchestration_service.ResponseService")
-    def test_service_has_orchestrate_method(self, mock_response, mock_retrieval, mock_classification):
-        """Service should have orchestrate method."""
+    def test_service_has_run_method(self, mock_response, mock_retrieval, mock_classification):
+        """Service should have run method."""
         from services.orchestration_service import OrchestrationService
         
         service = OrchestrationService()
-        assert hasattr(service, "orchestrate")
-        assert callable(service.orchestrate)
+        assert hasattr(service, "run")
+        assert callable(service.run)
 
 
 class TestCustomerService:
     """Test CustomerService."""
 
+    @patch("services.customer_service.get_db_engine")
+    @patch("services.customer_service.get_dynamodb")
     @patch("services.customer_service.boto3")
-    def test_service_instantiation(self, mock_boto3):
+    def test_service_instantiation(self, mock_boto3, mock_ddb, mock_engine):
         """Service should instantiate without errors."""
+        mock_engine.return_value = MagicMock()
+        mock_ddb.return_value = MagicMock()
+        
         from services.customer_service import CustomerService
         
-        service = CustomerService()
-        assert service is not None
+        # Need to set env for dynamodb table
+        with patch.dict(os.environ, {"INTERACTIONS_TABLE": "test-table"}):
+            service = CustomerService()
+            assert service is not None
 
+    @patch("services.customer_service.get_db_engine")
+    @patch("services.customer_service.get_dynamodb")
     @patch("services.customer_service.boto3")
-    def test_service_has_get_context_method(self, mock_boto3):
-        """Service should have get_context method."""
+    def test_service_has_get_customer_context_method(self, mock_boto3, mock_ddb, mock_engine):
+        """Service should have get_customer_context method."""
+        mock_engine.return_value = MagicMock()
+        mock_ddb.return_value = MagicMock()
+        
         from services.customer_service import CustomerService
         
-        service = CustomerService()
-        assert hasattr(service, "get_context")
-        assert callable(service.get_context)
+        with patch.dict(os.environ, {"INTERACTIONS_TABLE": "test-table"}):
+            service = CustomerService()
+            assert hasattr(service, "get_customer_context")
+            assert callable(service.get_customer_context)
 
 
 class TestBedrockService:

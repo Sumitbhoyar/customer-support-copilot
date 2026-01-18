@@ -1,10 +1,20 @@
+"""
+Tests for customer context handler.
+"""
 import json
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.handlers import customer_context
-from src.models.customer import CustomerContext
+# Add src to path
+SRC_PATH = Path(__file__).parent.parent.parent / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+from models.customer import CustomerContext
 
 
 def _sample_customer_context() -> CustomerContext:
@@ -26,18 +36,23 @@ def _sample_customer_context() -> CustomerContext:
     )
 
 
-def test_customer_context_happy_path(monkeypatch):
-    monkeypatch.setattr(
-        customer_context.customer_service,
-        "get_customer_context",
-        lambda external_id: _sample_customer_context(),
-    )
-    event = {
-        "pathParameters": {"id": "cust-ext-1"},
-        "queryStringParameters": None,
-    }
-
-    resp = customer_context.lambda_handler(event, None)
+def test_customer_context_happy_path():
+    """Test customer context returns 200 with valid customer."""
+    from handlers import customer_context
+    
+    # Reset lazy-loaded service
+    customer_context._customer_service = None
+    
+    mock_service = MagicMock()
+    mock_service.get_customer_context.return_value = _sample_customer_context()
+    
+    with patch.object(customer_context, '_get_customer_service', return_value=mock_service):
+        event = {
+            "pathParameters": {"id": "cust-ext-1"},
+            "queryStringParameters": None,
+        }
+        resp = customer_context.lambda_handler(event, None)
+        
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
     assert body["email"] == "jane@example.com"
@@ -45,18 +60,29 @@ def test_customer_context_happy_path(monkeypatch):
 
 
 def test_customer_context_missing_id_returns_400():
+    """Test missing customer ID returns 400."""
+    from handlers import customer_context
+    
     event = {"pathParameters": None, "queryStringParameters": None}
     resp = customer_context.lambda_handler(event, None)
     assert resp["statusCode"] == 400
 
 
-def test_customer_context_not_found(monkeypatch):
-    monkeypatch.setattr(
-        customer_context.customer_service, "get_customer_context", lambda external_id: None
-    )
-    event = {
-        "pathParameters": {"id": "unknown"},
-        "queryStringParameters": None,
-    }
-    resp = customer_context.lambda_handler(event, None)
+def test_customer_context_not_found():
+    """Test unknown customer returns 404."""
+    from handlers import customer_context
+    
+    # Reset lazy-loaded service
+    customer_context._customer_service = None
+    
+    mock_service = MagicMock()
+    mock_service.get_customer_context.return_value = None
+    
+    with patch.object(customer_context, '_get_customer_service', return_value=mock_service):
+        event = {
+            "pathParameters": {"id": "unknown"},
+            "queryStringParameters": None,
+        }
+        resp = customer_context.lambda_handler(event, None)
+        
     assert resp["statusCode"] == 404

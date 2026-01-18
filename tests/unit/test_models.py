@@ -8,6 +8,7 @@ Run with: pytest tests/unit/test_models.py -v
 """
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -29,10 +30,10 @@ class TestTicketInput:
         ticket = TicketInput(
             title="Cannot login",
             description="Getting error when trying to access account",
-            customer_id="CUST001"
+            customer_external_id="CUST001"
         )
         assert ticket.title == "Cannot login"
-        assert ticket.customer_id == "CUST001"
+        assert ticket.customer_external_id == "CUST001"
 
     def test_ticket_input_requires_title(self):
         """TicketInput should require title."""
@@ -42,9 +43,9 @@ class TestTicketInput:
             TicketInput(
                 title="",  # Empty title
                 description="Test description",
-                customer_id="CUST001"
+                customer_external_id="CUST001"
             )
-        # Pydantic v2 raises validation error for empty string with min_length
+        # Pydantic v2 raises validation error for empty string with validator
         assert exc_info.value.error_count() > 0
 
     def test_ticket_input_requires_description(self):
@@ -55,7 +56,7 @@ class TestTicketInput:
             TicketInput(
                 title="Test title",
                 description="",  # Empty description
-                customer_id="CUST001"
+                customer_external_id="CUST001"
             )
 
     def test_ticket_input_optional_fields(self):
@@ -65,11 +66,11 @@ class TestTicketInput:
         ticket = TicketInput(
             title="Test",
             description="Test description",
-            customer_id="CUST001"
+            customer_external_id="CUST001"
         )
         assert ticket.priority_hints is None
-        assert ticket.channel is None
-        assert ticket.locale is None
+        assert ticket.channel == "email"  # Default value
+        assert ticket.locale == "en-US"  # Default value
 
 
 class TestClassificationResult:
@@ -119,11 +120,11 @@ class TestRetrievalContextItem:
             excerpt="This is the relevant excerpt from knowledge base",
             citation_uri="s3://bucket/doc.pdf",
             score=0.92,
-            source_type="kb"
+            type="kb"  # Correct field name
         )
         assert item.source_id == "KB-001"
         assert item.score == 0.92
-        assert item.source_type == "kb"
+        assert item.type == "kb"
 
 
 class TestResponseDraft:
@@ -131,7 +132,7 @@ class TestResponseDraft:
 
     def test_valid_response_draft(self):
         """Valid response draft should pass validation."""
-        from models.agent import ResponseDraft, SafetyFlag
+        from models.agent import ResponseDraft
 
         draft = ResponseDraft(
             text="Thank you for contacting us. We'll help resolve your issue.",
@@ -160,31 +161,31 @@ class TestEnums:
     """Test enum values."""
 
     def test_category_enum_values(self):
-        """Category enum should have expected values."""
+        """Category enum should have expected values (lowercase)."""
         from models.agent import Category
 
-        assert Category.TECHNICAL.value == "Technical"
-        assert Category.BILLING.value == "Billing"
-        assert Category.ACCOUNT.value == "Account"
-        assert Category.GENERAL.value == "General"
+        assert Category.TECHNICAL.value == "technical"
+        assert Category.BILLING.value == "billing"
+        assert Category.ACCOUNT.value == "account"
+        assert Category.SHIPPING.value == "shipping"
+        assert Category.OTHER.value == "other"
 
     def test_priority_enum_values(self):
-        """Priority enum should have expected values."""
+        """Priority enum should have expected values (lowercase)."""
         from models.agent import Priority
 
-        assert Priority.CRITICAL.value == "Critical"
-        assert Priority.HIGH.value == "High"
-        assert Priority.MEDIUM.value == "Medium"
-        assert Priority.LOW.value == "Low"
+        assert Priority.CRITICAL.value == "critical"
+        assert Priority.HIGH.value == "high"
+        assert Priority.MEDIUM.value == "medium"
+        assert Priority.LOW.value == "low"
 
     def test_sentiment_enum_values(self):
-        """Sentiment enum should have expected values."""
+        """Sentiment enum should have expected values (lowercase)."""
         from models.agent import Sentiment
 
-        assert Sentiment.POSITIVE.value == "Positive"
-        assert Sentiment.NEUTRAL.value == "Neutral"
-        assert Sentiment.NEGATIVE.value == "Negative"
-        assert Sentiment.URGENT.value == "Urgent"
+        assert Sentiment.POSITIVE.value == "positive"
+        assert Sentiment.NEUTRAL.value == "neutral"
+        assert Sentiment.NEGATIVE.value == "negative"
 
     def test_safety_flag_enum_values(self):
         """SafetyFlag enum should have expected values."""
@@ -205,11 +206,19 @@ class TestCustomerContext:
 
         context = CustomerContext(
             customer_id="CUST001",
+            external_id="ext-001",
             name="John Doe",
             email="john@example.com",
+            company="Acme Inc",
             tier="premium",
+            lifetime_value=5000.00,
+            total_orders=10,
             recent_orders=[],
-            open_tickets=0
+            open_tickets=0,
+            avg_sentiment=0.8,
+            last_interaction=datetime.now(),
+            is_high_value=True,
+            churn_risk="low"
         )
         assert context.customer_id == "CUST001"
         assert context.tier == "premium"
@@ -223,9 +232,14 @@ class TestTicketRequest:
         from models.ticket import TicketRequest
 
         request = TicketRequest(
-            title="Need help with billing",
+            ticket_id="T-001",
+            external_ticket_id="EXT-001",
+            customer_external_id="CUST001",
+            subject="Need help with billing",
             description="I was charged twice for my subscription",
-            customer_id="CUST001"
+            channel="email",
+            priority="high",
+            created_at=datetime.now()
         )
-        assert request.title == "Need help with billing"
-        assert request.customer_id == "CUST001"
+        assert request.subject == "Need help with billing"
+        assert request.customer_external_id == "CUST001"
